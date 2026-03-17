@@ -9,6 +9,10 @@ pub struct Block {
    pub timestamp: u64,
    pub nonce: u64,
    pub transactions: Vec<Transaction>,
+   /// Commitment hash of the transaction list. Computed once when the block is
+   /// assembled and included in the mined header so that mining speed is
+   /// independent of block size — only the 8-byte nonce is hashed per attempt.
+   pub tx_root: Vec<u8>,
    pub hash: Vec<u8>,
 }
 
@@ -23,16 +27,24 @@ pub fn meets_difficulty(hash: &[u8], bits: u32) -> bool {
 }
 
 impl Block {
+    /// Hash the full transaction list into a fixed-size commitment.
+    /// Called once when a block is assembled; the result is stored in `tx_root`.
+    pub fn compute_tx_root(transactions: &[Transaction]) -> Vec<u8> {
+        let data = bincode::serialize(transactions).unwrap();
+        CubeHash256::digest(&data).to_vec()
+    }
+
+    /// Hash only the fixed-size block header. Because `tx_root` already commits
+    /// to the transaction list, the per-iteration work during mining is constant
+    /// regardless of how many transactions the block contains.
     pub fn calculate_hash(&self) -> Vec<u8> {
         let data = bincode::serialize(&(
             self.index,
             &self.previous_hash,
             self.timestamp,
             self.nonce,
-            &self.transactions
-            )).unwrap();
-
-        let hash = CubeHash256::digest(&data);
-        hash.to_vec()
+            &self.tx_root,
+        )).unwrap();
+        CubeHash256::digest(&data).to_vec()
     }
 }
