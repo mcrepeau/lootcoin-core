@@ -10,7 +10,7 @@ Shared protocol types, cryptographic primitives, and constants used by all Lootc
 
 The fundamental unit of the chain. Fields: `index`, `previous_hash`, `timestamp`, `nonce`, `transactions`, `hash`.
 
-- `calculate_hash()` serialises `(index, previous_hash, timestamp, nonce, transactions)` with `bincode` and hashes the result with CubeHash-256. The `hash` field is excluded from the input so it can be set after mining.
+- `calculate_hash()` serialises `(index, previous_hash, timestamp, nonce, tx_root)` with `bincode` and hashes the result with CubeHash-256. The `hash` field is excluded from the input so it can be set after mining. Using `tx_root` rather than the full transaction list means the mining loop only hashes the fixed-size header — transaction count does not affect mining performance.
 - `meets_difficulty(hash, bits)` returns `true` if the first `bits` bits of `hash` are all zero. Used by both the node (block validation) and the miner (PoW loop).
 
 ### `transaction`
