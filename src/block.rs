@@ -16,14 +16,38 @@ pub struct Block {
    pub hash: Vec<u8>,
 }
 
-/// Returns true if the first `bits` bits of `hash` are all zero.
-pub fn meets_difficulty(hash: &[u8], bits: u32) -> bool {
-    let full_bytes = (bits / 8) as usize;
-    let extra_bits = bits % 8;
-    let min_len = full_bytes + if extra_bits > 0 { 1 } else { 0 };
-    hash.len() >= min_len
-        && hash[..full_bytes].iter().all(|&b| b == 0)
-        && (extra_bits == 0 || hash[full_bytes] >> (8 - extra_bits) == 0)
+/// Returns true if `hash` (big-endian unsigned integer) is strictly less than
+/// `2^(256 - bits)`, i.e., the hash meets the given difficulty.
+///
+/// `bits` may be fractional, enabling sub-bit difficulty adjustments that avoid
+/// the oscillation caused by rounding to whole bits on every retarget.
+pub fn meets_difficulty(hash: &[u8], bits: f64) -> bool {
+    if bits <= 0.0 { return true; }
+
+    // n full zero bytes must precede the boundary byte.
+    let n = (bits / 8.0) as usize;
+    let remainder = bits - (n as f64 * 8.0); // [0.0, 8.0)
+
+    if hash.len() < n + 1 { return false; }
+    if hash[..n].iter().any(|&b| b != 0) { return false; }
+    if remainder == 0.0 { return true; }
+
+    // Threshold for hash[n]: must be strictly less than 2^(8 - remainder).
+    // Walk byte-by-byte using a floating-point threshold, descending into the
+    // fractional part whenever hash[i] exactly equals floor(threshold).
+    let mut threshold = 2.0f64.powf(8.0 - remainder);
+    for &byte in &hash[n..] {
+        let b = byte as f64;
+        let t_floor = threshold.floor();
+        if b < t_floor { return true; }
+        if b > t_floor { return false; }
+        // b == floor(threshold): check whether threshold has a fractional part.
+        let frac = threshold - t_floor;
+        if frac == 0.0 { return false; } // hash equals the exact threshold → fail
+        threshold = frac * 256.0;
+    }
+    // All bytes exhausted: passes iff threshold is non-integer (hash < threshold).
+    threshold.fract() > 0.0
 }
 
 impl Block {

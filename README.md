@@ -11,7 +11,43 @@ Shared protocol types, cryptographic primitives, and constants used by all Lootc
 The fundamental unit of the chain. Fields: `index`, `previous_hash`, `timestamp`, `nonce`, `transactions`, `hash`.
 
 - `calculate_hash()` serialises `(index, previous_hash, timestamp, nonce, tx_root)` with `bincode` and hashes the result with CubeHash-256. The `hash` field is excluded from the input so it can be set after mining. Using `tx_root` rather than the full transaction list means the mining loop only hashes the fixed-size header — transaction count does not affect mining performance.
-- `meets_difficulty(hash, bits)` returns `true` if the first `bits` bits of `hash` are all zero. Used by both the node (block validation) and the miner (PoW loop).
+- `meets_difficulty(hash, bits: f64)` returns `true` if the hash meets the given difficulty target. Accepts fractional bit values — see [Fractional difficulty](#fractional-difficulty) below.
+
+---
+
+## Fractional difficulty
+
+Most PoW chains store difficulty as an integer number of leading zero bits. The problem is that each bit represents a 2× change in expected work, so rounding to the nearest integer on every retarget window produces oscillation: if blocks are only slightly too fast, difficulty rounds up by one full bit (halving the block rate), then rounds back down next window, and so on indefinitely.
+
+Lootcoin stores difficulty as a `f64` fractional bit count. A value like `26.47` is perfectly valid and processed by `meets_difficulty` using a numeric threshold on the first non-zero byte rather than a pure bit mask.
+
+**What fractional bits mean conceptually:**
+
+Difficulty `D` means the block hash, treated as a big-endian 256-bit integer, must be strictly less than `2^(256 − D)`.
+
+| Difficulty | Leading zero bytes | Boundary byte must be less than | Values of that byte that pass |
+|---|---|---|---|
+| `26.0` | 3 | `2^6.0` = 64.00 | `0x00`–`0x3F` (64 values) |
+| `26.5` | 3 | `2^5.5` ≈ 45.25 | `0x00`–`0x2C` (45 values) |
+| `27.0` | 3 | `2^5.0` = 32.00 | `0x00`–`0x1F` (32 values) |
+
+A fractional difficulty sits between two integers on a logarithmic scale: `26.5` is exactly halfway in expected hash count between `26` and `27`.
+
+**Implementation:**
+
+`meets_difficulty` walks the hash byte-by-byte using a floating-point threshold. When a byte exactly equals `floor(threshold)`, it descends into the fractional part for the next byte, giving a correct comparison without any 256-bit integer arithmetic:
+
+```
+threshold = 2^(8 − remainder)   // e.g. 2^5.5 ≈ 45.25 for D = 26.5
+
+for each byte b (starting after the mandatory zero bytes):
+    if b < floor(threshold)  → pass
+    if b > floor(threshold)  → fail
+    // b == floor(threshold): the answer depends on the bytes that follow
+    threshold = frac(threshold) × 256
+```
+
+The miner is unaffected: it calls `meets_difficulty(hash, difficulty)` and gets a boolean back. The fractional threshold is invisible at the mining loop level.
 
 ### `transaction`
 
