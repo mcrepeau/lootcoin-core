@@ -9,6 +9,13 @@ pub const REVEAL_BLOCKS: u64 = 10;
 /// Number of equally-likely outcome buckets per lottery draw.
 pub const PPM: u32 = 1_000_000;
 
+/// Maximum non-coinbase transaction count that contributes to the ticket payout
+/// multiplier. A ticket's payout is scaled by `min(tx_count, TX_MULTIPLIER_CAP)
+/// / TX_MULTIPLIER_CAP`, giving miners a continuous per-transaction incentive
+/// to include transactions up to this cap. Beyond the cap, the full base payout
+/// applies and there is no additional benefit to cramming more transactions in.
+pub const TX_MULTIPLIER_CAP: u64 = 20;
+
 /// Pot payout divisors per tier.
 ///
 /// Rewards are a fraction of the current pot rather than fixed amounts.
@@ -16,16 +23,17 @@ pub const PPM: u32 = 1_000_000;
 /// naturally dampens whale creation: each successive winner gets less as
 /// the pot shrinks, while fees continuously replenish it.
 ///
+/// The base payout (at TX_MULTIPLIER_CAP transactions) is:
 ///   Tier    │ Divisor  │  % of pot  │ Initial value (99.9M pot)
 ///   ────────┼──────────┼────────────┼──────────────────────────
-///   SMALL   │ 100,000  │  0.001 %   │        ~999
-///   MEDIUM  │  10,000  │  0.01  %   │       ~9,990
-///   LARGE   │   1,000  │  0.1   %   │      ~99,900
-///   JACKPOT │     200  │  0.5   %   │     ~499,500
-pub const SMALL_DIVISOR:   u64 = 100_000;
-pub const MEDIUM_DIVISOR:  u64 =  10_000;
-pub const LARGE_DIVISOR:   u64 =   1_000;
-pub const JACKPOT_DIVISOR: u64 =     200;
+///   SMALL   │ 500,000  │ 0.0002 %   │         ~200
+///   MEDIUM  │  50,000  │ 0.002  %   │        ~2,000
+///   LARGE   │   5,000  │ 0.02   %   │       ~20,000
+///   JACKPOT │   1,000  │ 0.1    %   │      ~100,000
+pub const SMALL_DIVISOR:   u64 = 500_000;
+pub const MEDIUM_DIVISOR:  u64 =  50_000;
+pub const LARGE_DIVISOR:   u64 =   5_000;
+pub const JACKPOT_DIVISOR: u64 =   1_000;
 
 /// Fee-based inclusion delay constant.
 ///

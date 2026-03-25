@@ -13,11 +13,60 @@ The fundamental unit of the chain. Fields: `index`, `previous_hash`, `timestamp`
 - `calculate_hash()` serialises `(index, previous_hash, timestamp, nonce, tx_root)` with `bincode` and hashes the result with CubeHash-256. The `hash` field is excluded from the input so it can be set after mining. Using `tx_root` rather than the full transaction list means the mining loop only hashes the fixed-size header — transaction count does not affect mining performance.
 - `meets_difficulty(hash, bits: f64)` returns `true` if the hash meets the given difficulty target. Accepts fractional bit values — see [Fractional difficulty](#fractional-difficulty) below.
 
+### `transaction`
+
+Represents a transfer of coins between two addresses. Fields: `sender`, `receiver`, `amount`, `fee`, `nonce`, `public_key`, `signature`.
+
+- Coinbase transactions have an empty `sender` and carry no signature.
+- Non-coinbase transactions are signed with Ed25519 over `bincode(sender, receiver, amount, fee, nonce)`.
+- `new_signed(wallet, receiver, amount, fee)` constructs and signs a transaction, generating a random 53-bit nonce for uniqueness (53 bits keeps the value within JavaScript's safe integer range).
+- `verify()` checks that `public_key` hashes to `sender` and that the Ed25519 signature is valid.
+
+### `wallet`
+
+Ed25519 keypair wrapper.
+
+- `Wallet::new()` generates a fresh keypair using the OS CSPRNG.
+- `Wallet::from_secret_key_bytes(bytes)` restores a wallet from a 32-byte seed.
+- `secret_key_bytes()` exports the 32-byte seed.
+- `get_address()` returns the 64-char hex-encoded CubeHash-256 digest of the public key.
+- `get_public_key_bytes()` returns the raw 32-byte Ed25519 public key.
+- `sign(data)` signs arbitrary bytes with the private key.
+
+### `lottery`
+
+Protocol constants shared across all crates. Any tool that needs to reason about lottery timing or payouts should import from here rather than hardcoding values.
+
+| Constant | Value | Meaning |
+|---|---|---|
+| `TICKET_MATURITY` | 100 blocks | Blocks before a mined ticket enters the reveal window |
+| `REVEAL_BLOCKS` | 10 blocks | Block hashes accumulated as lottery entropy |
+| `PPM` | 1,000,000 | Outcome buckets per draw |
+| `TX_MULTIPLIER_CAP` | 20 | Max tx count that scales ticket payout |
+| `SMALL_DIVISOR` | 500,000 | 98.00% tier — pot / 500,000 (at full multiplier) |
+| `MEDIUM_DIVISOR` | 50,000 | 1.90% tier — pot / 50,000 (at full multiplier) |
+| `LARGE_DIVISOR` | 5,000 | 0.09% tier — pot / 5,000 (at full multiplier) |
+| `JACKPOT_DIVISOR` | 1,000 | 0.01% tier — pot / 1,000 (at full multiplier) |
+| `GUARANTEE_AFTER` | 120 blocks | Fee eligibility formula: `eligible_after = (GUARANTEE_AFTER / fee) - 1` |
+
+---
+
+## Cryptography
+
+| Primitive | Algorithm | Used for |
+|---|---|---|
+| Block hashing | CubeHash-256 | PoW, chain linkage, address derivation |
+| Transaction signing | Ed25519 (ed25519-dalek) | Authorising transfers |
+| Key generation | OS CSPRNG (rand) | Wallet creation |
+
+Ed25519 was chosen for compact 64-byte signatures, fast verification, and strong security margins. CubeHash-256 was chosen as a NIST SHA-3 finalist that is simple to implement and has no known length-extension vulnerabilities.
+
 ---
 
 ## Fractional difficulty
 
-Most PoW chains store difficulty as an integer number of leading zero bits. The problem is that each bit represents a 2× change in expected work, so rounding to the nearest integer on every retarget window produces oscillation: if blocks are only slightly too fast, difficulty rounds up by one full bit (halving the block rate), then rounds back down next window, and so on indefinitely.
+Most PoW chains store difficulty as an integer number of leading zero bits. Lootcoin aims for 60-second blocks and adjusts the difficulty accordingly.
+The problem is that each bit represents a 2× change in expected work, so rounding to the nearest integer on every retarget window produces oscillation: if blocks are only slightly too fast, difficulty rounds up by one full bit (halving the block rate), then rounds back down next window, and so on indefinitely.
 
 Lootcoin stores difficulty as a `f64` fractional bit count. A value like `26.47` is perfectly valid and processed by `meets_difficulty` using a numeric threshold on the first non-zero byte rather than a pure bit mask.
 
@@ -48,50 +97,3 @@ for each byte b (starting after the mandatory zero bytes):
 ```
 
 The miner is unaffected: it calls `meets_difficulty(hash, difficulty)` and gets a boolean back. The fractional threshold is invisible at the mining loop level.
-
-### `transaction`
-
-Represents a transfer of coins between two addresses. Fields: `sender`, `receiver`, `amount`, `fee`, `nonce`, `public_key`, `signature`.
-
-- Coinbase transactions have an empty `sender` and carry no signature.
-- Non-coinbase transactions are signed with Ed25519 over `bincode(sender, receiver, amount, fee, nonce)`.
-- `new_signed(wallet, receiver, amount, fee)` constructs and signs a transaction, generating a random 53-bit nonce for uniqueness (53 bits keeps the value within JavaScript's safe integer range).
-- `verify()` checks that `public_key` hashes to `sender` and that the Ed25519 signature is valid.
-
-### `wallet`
-
-Ed25519 keypair wrapper.
-
-- `Wallet::new()` generates a fresh keypair using the OS CSPRNG.
-- `Wallet::from_secret_key_bytes(bytes)` restores a wallet from a 32-byte seed.
-- `secret_key_bytes()` exports the 32-byte seed.
-- `get_address()` returns the 64-char hex-encoded CubeHash-256 digest of the public key.
-- `get_public_key_bytes()` returns the raw 32-byte Ed25519 public key.
-- `sign(data)` signs arbitrary bytes with the private key.
-
-### `lottery`
-
-Protocol constants shared across all crates. Any tool that needs to reason about lottery timing or payouts should import from here rather than hardcoding values.
-
-| Constant | Value | Meaning |
-|---|---|---|
-| `TICKET_MATURITY` | 100 blocks | Blocks before a mined ticket enters the reveal window |
-| `REVEAL_BLOCKS` | 10 blocks | Block hashes accumulated as lottery entropy |
-| `PPM` | 1,000,000 | Outcome buckets per draw |
-| `SMALL_DIVISOR` | 100,000 | 98.00% tier — pot / 100,000 |
-| `MEDIUM_DIVISOR` | 10,000 | 1.90% tier — pot / 10,000 |
-| `LARGE_DIVISOR` | 1,000 | 0.09% tier — pot / 1,000 |
-| `JACKPOT_DIVISOR` | 200 | 0.01% tier — pot / 200 |
-| `GUARANTEE_AFTER` | 120 blocks | Fee eligibility formula: `eligible_after = (GUARANTEE_AFTER / fee) - 1` |
-
----
-
-## Cryptography
-
-| Primitive | Algorithm | Used for |
-|---|---|---|
-| Block hashing | CubeHash-256 | PoW, chain linkage, address derivation |
-| Transaction signing | Ed25519 (ed25519-dalek) | Authorising transfers |
-| Key generation | OS CSPRNG (rand) | Wallet creation |
-
-Ed25519 was chosen for compact 64-byte signatures, fast verification, and strong security margins. CubeHash-256 was chosen as a NIST SHA-3 finalist that is simple to implement and has no known length-extension vulnerabilities.
