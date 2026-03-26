@@ -50,7 +50,8 @@ impl Transaction {
 
     pub fn verify(&self) -> bool {
         // Fix 1: public key must hash to sender address
-        let expected_addr = hex::encode(CubeHash256::digest(&self.public_key));
+        let hash: [u8; 32] = CubeHash256::digest(&self.public_key).into();
+        let expected_addr = crate::wallet::encode_address(&hash);
         if expected_addr != self.sender {
             return false;
         }
