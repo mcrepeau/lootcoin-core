@@ -42,11 +42,11 @@ Protocol constants shared across all crates. Any tool that needs to reason about
 | `TICKET_MATURITY` | 100 blocks | Blocks before a mined ticket enters the reveal window |
 | `REVEAL_BLOCKS` | 10 blocks | Block hashes accumulated as lottery entropy |
 | `PPM` | 1,000,000 | Outcome buckets per draw |
-| `TX_MULTIPLIER_CAP` | 20 | Max tx count that scales ticket payout |
-| `SMALL_DIVISOR` | 500,000 | 98.00% tier — pot / 500,000 (at full multiplier) |
-| `MEDIUM_DIVISOR` | 50,000 | 1.90% tier — pot / 50,000 (at full multiplier) |
-| `LARGE_DIVISOR` | 5,000 | 0.09% tier — pot / 5,000 (at full multiplier) |
-| `JACKPOT_DIVISOR` | 1,000 | 0.01% tier — pot / 1,000 (at full multiplier) |
+| `MIN_TX_FEE` | 2 | Minimum fee for non-coinbase transactions; ensures 50/50 fee split gives ≥1 coin to each side |
+| `SMALL_DIVISOR` | 400,000 | 36.25% tier — `pot / 400,000` |
+| `MEDIUM_DIVISOR` | 30,000 | 1.67% tier — `pot / 30,000` (~hourly) |
+| `LARGE_DIVISOR` | 2,000 | 0.07% tier — `pot / 2,000` (~daily) |
+| `JACKPOT_DIVISOR` | 500 | 0.01% tier — `pot / 500` (~weekly) |
 | `GUARANTEE_AFTER` | 120 blocks | Fee eligibility formula: `eligible_after = (GUARANTEE_AFTER / fee) - 1` |
 
 ---

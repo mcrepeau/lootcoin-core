@@ -2,6 +2,11 @@ use cubehash::CubeHash256;
 use serde::{Serialize, Deserialize};
 use crate::transaction::Transaction;
 
+/// Maximum non-coinbase transactions a block may contain.
+/// Prevents DoS via enormous blocks from a flooded mempool.
+/// At the 60 s target block time this gives a sustained throughput of 4 tps.
+pub const MAX_BLOCK_TXS: usize = 240;
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Block {
    pub index: u64,

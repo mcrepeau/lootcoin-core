@@ -9,41 +9,67 @@ pub const REVEAL_BLOCKS: u64 = 10;
 /// Number of equally-likely outcome buckets per lottery draw.
 pub const PPM: u32 = 1_000_000;
 
-/// Maximum non-coinbase transaction count that contributes to the ticket payout
-/// multiplier. A ticket's payout is scaled by `min(tx_count, TX_MULTIPLIER_CAP)
-/// / TX_MULTIPLIER_CAP`, giving miners a continuous per-transaction incentive
-/// to include transactions up to this cap. Beyond the cap, the full base payout
-/// applies and there is no additional benefit to cramming more transactions in.
-pub const TX_MULTIPLIER_CAP: u64 = 20;
-
 /// Pot payout divisors per tier.
+///
+/// Payout formula: `pot / DIVISOR`
+///
+/// Every winning ticket receives the same flat fraction of the pot regardless
+/// of how many transactions were in the block. Per-transaction miner incentives
+/// are provided by the 50/50 fee split instead.
+///
+///   Tier    │ Probability │  Divisor  │ Prize at pot=99M  │ Expected frequency
+///   ────────┼─────────────┼───────────┼───────────────────┼───────────────────
+///   SMALL   │    36.25%   │ 400,000   │        ~247 coins │ every ~3 blocks
+///   MEDIUM  │     1.67%   │  30,000   │      ~3,300 coins │ every ~60 blocks (~1 h)
+///   LARGE   │     0.07%   │   2,000   │     ~49,500 coins │ every ~1,440 blocks (~1 day)
+///   JACKPOT │     0.01%   │     500   │    ~198,000 coins │ every ~10,080 blocks (~1 week)
+///
+/// No-win probability: 62.00% (bucket 0..=619,999 out of PPM=1,000,000).
+///
+/// Total payouts decrease across tiers (small dominates aggregate payout)
+/// matching real-lottery conventions while keeping jackpots exciting.
+///
+/// Expected value per ticket decreases across tiers (p/D): each higher tier
+/// is a strictly worse bet, with the excitement premium compensating for EV.
 ///
 /// Rewards are a fraction of the current pot rather than fixed amounts.
 /// This prevents the pot from ever fully draining (asymptotic decay) and
 /// naturally dampens whale creation: each successive winner gets less as
 /// the pot shrinks, while fees continuously replenish it.
+pub const SMALL_DIVISOR:   u64 = 400_000;
+pub const MEDIUM_DIVISOR:  u64 =  30_000;
+pub const LARGE_DIVISOR:   u64 =   2_000;
+pub const JACKPOT_DIVISOR: u64 =     500;
+
+/// Lottery outcome bucket boundaries (out of PPM = 1,000,000).
 ///
-/// The base payout (at TX_MULTIPLIER_CAP transactions) is:
-///   Tier    │ Divisor  │  % of pot  │ Initial value (99.9M pot)
-///   ────────┼──────────┼────────────┼──────────────────────────
-///   SMALL   │ 500,000  │ 0.0002 %   │         ~200
-///   MEDIUM  │  50,000  │ 0.002  %   │        ~2,000
-///   LARGE   │   5,000  │ 0.02   %   │       ~20,000
-///   JACKPOT │   1,000  │ 0.1    %   │      ~100,000
-pub const SMALL_DIVISOR:   u64 = 500_000;
-pub const MEDIUM_DIVISOR:  u64 =  50_000;
-pub const LARGE_DIVISOR:   u64 =   5_000;
-pub const JACKPOT_DIVISOR: u64 =   1_000;
+/// Buckets [0, SMALL_BUCKET_START)  → no-win  (62.00%)
+/// Buckets [SMALL_BUCKET_START,  MEDIUM_BUCKET_START)  → small   (36.25%)
+/// Buckets [MEDIUM_BUCKET_START, LARGE_BUCKET_START)   → medium  ( 1.67%)
+/// Buckets [LARGE_BUCKET_START,  JACKPOT_BUCKET_START) → large   ( 0.07%)
+/// Buckets [JACKPOT_BUCKET_START, PPM)                 → jackpot ( 0.01%)
+pub const SMALL_BUCKET_START:   u32 = 620_000;
+pub const MEDIUM_BUCKET_START:  u32 = 982_500;
+pub const LARGE_BUCKET_START:   u32 = 999_200;
+pub const JACKPOT_BUCKET_START: u32 = 999_900;
+
+/// Minimum fee required for a non-coinbase transaction.
+///
+/// A fee of at least 2 ensures the 50/50 fee split always gives at least 1 coin
+/// to the miner AND 1 coin to the pot. A fee of 1 would be rounded down to 0 for
+/// one side under integer division, effectively removing the lottery pot incentive
+/// or the miner incentive. Transactions with fee < MIN_TX_FEE are rejected.
+pub const MIN_TX_FEE: u64 = 2;
 
 /// Fee-based inclusion delay constant.
 ///
 /// `eligible_after(fee) = (GUARANTEE_AFTER / fee).saturating_sub(1)` blocks.
 ///
 /// Examples (1 block ≈ 60 s):
-///   fee = 1   → 119 blocks (~2 h)
+///   fee = 2   →  59 blocks (~1 h)   ← minimum fee
 ///   fee = 12  →   9 blocks (~9 min)
 ///   fee ≥ 120 →   0 blocks (next block)
 ///
-/// Any transaction with fee > 0 is guaranteed inclusion within GUARANTEE_AFTER
-/// blocks regardless of congestion. Transactions with fee = 0 are never included.
+/// Any transaction with fee ≥ MIN_TX_FEE is guaranteed inclusion within
+/// GUARANTEE_AFTER blocks regardless of congestion.
 pub const GUARANTEE_AFTER: u64 = 120;
