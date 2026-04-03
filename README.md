@@ -47,6 +47,10 @@ Protocol constants shared across all crates. Any tool that needs to reason about
 | `MEDIUM_DIVISOR` | 30,000 | 1.67% tier — `pot / 30,000` (~hourly) |
 | `LARGE_DIVISOR` | 2,000 | 0.07% tier — `pot / 2,000` (~daily) |
 | `JACKPOT_DIVISOR` | 500 | 0.01% tier — `pot / 500` (~weekly) |
+| `SMALL_BUCKET_START` | 620,000 | First PPM bucket that maps to the `small` tier |
+| `MEDIUM_BUCKET_START` | 982,500 | First PPM bucket that maps to the `medium` tier |
+| `LARGE_BUCKET_START` | 999,200 | First PPM bucket that maps to the `large` tier |
+| `JACKPOT_BUCKET_START` | 999,900 | First PPM bucket that maps to the `jackpot` tier |
 | `GUARANTEE_AFTER` | 120 blocks | Fee eligibility formula: `eligible_after = (GUARANTEE_AFTER / fee) - 1` |
 
 ---
