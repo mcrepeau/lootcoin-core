@@ -86,4 +86,29 @@ impl Transaction {
 
         pubkey.verify(&tx_bytes, &signature).is_ok()
     }
+
+    /// Compute this transaction's identifier — a 32-byte CubeHash256 digest
+    /// of all fields including the signature.
+    ///
+    /// For user transactions the txid is stable: it is determined at signing
+    /// time and does not change when the transaction is included in a block.
+    ///
+    /// Coinbase transactions (empty sender, empty signature) that share the
+    /// same receiver and reward amount will produce the same txid. Callers
+    /// that need a globally unique identifier for coinbase entries should
+    /// incorporate the block index at the point of indexing (e.g. by hashing
+    /// `b"coinbase" || block_index_be`).
+    pub fn txid(&self) -> [u8; 32] {
+        let data = bincode::serialize(&(
+            &self.sender,
+            &self.receiver,
+            &self.amount,
+            &self.fee,
+            &self.nonce,
+            &self.public_key,
+            &self.signature,
+        ))
+        .unwrap();
+        CubeHash256::digest(&data).into()
+    }
 }
