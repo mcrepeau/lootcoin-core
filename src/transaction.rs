@@ -3,6 +3,16 @@ use cubehash::CubeHash256;
 use ed25519_dalek::{VerifyingKey, Signature, Verifier};
 use serde::{Serialize, Deserialize};
 
+/// Domain separator included in every transaction's signed message.
+/// Prevents cross-chain replay: a signature produced for lootcoin mainnet
+/// is invalid on any chain that uses a different constant here, even if
+/// the sender address and nonce match.
+///
+/// Changing this constant is a protocol-breaking change (all existing
+/// signatures become invalid). It should only be changed for a deliberate
+/// hard fork or a new network.
+pub const CHAIN_ID: &[u8] = b"lootcoin-mainnet-1";
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Transaction {
     pub sender: String,
@@ -32,6 +42,7 @@ impl Transaction {
         };
 
         let tx_bytes = bincode::serialize(&(
+            CHAIN_ID,
             &temp_tx.sender,
             &temp_tx.receiver,
             &temp_tx.amount,
@@ -56,8 +67,10 @@ impl Transaction {
             Err(_) => return false,
         };
 
-        // Fix 2: nonce is part of the signed message
+        // Reconstruct the exact bytes that were signed: CHAIN_ID binds this
+        // signature to lootcoin mainnet, preventing cross-chain replay.
         let tx_bytes = bincode::serialize(&(
+            CHAIN_ID,
             &self.sender,
             &self.receiver,
             &self.amount,
