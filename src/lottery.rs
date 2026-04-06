@@ -1,10 +1,17 @@
-/// Number of blocks a ticket must wait before the reveal window opens.
-pub const TICKET_MATURITY: u64 = 100;
-
-/// Number of consecutive block hashes accumulated as lottery randomness.
-/// An attacker needs to control all REVEAL_BLOCKS blocks to manipulate the
-/// outcome; at 30% hashrate the probability of doing so is 0.3^10 ≈ 0.000006.
-pub const REVEAL_BLOCKS: u64 = 10;
+/// Number of consecutive block hashes accumulated as lottery randomness,
+/// starting from the block that issued the ticket.
+///
+/// These blocks serve as both the maturity delay and the entropy source:
+/// settlement fires at `created_height + REVEAL_BLOCKS` using blocks
+/// `[created_height, created_height + REVEAL_BLOCKS)` as randomness.
+///
+/// An attacker needs to control all REVEAL_BLOCKS consecutive blocks to
+/// steer the outcome; at 30% hashrate the probability is 0.3^100 ≈ 10^-52.
+///
+/// Must not exceed REORG_WINDOW in lootcoin-node (enforced by a compile-time
+/// assertion there) — the full reveal window must fit in the in-memory block
+/// cache when settlement fires.
+pub const REVEAL_BLOCKS: u64 = 100;
 
 /// Number of equally-likely outcome buckets per lottery draw.
 pub const PPM: u32 = 1_000_000;
