@@ -18,9 +18,9 @@ The fundamental unit of the chain. Fields: `index`, `previous_hash`, `timestamp`
 Represents a transfer of coins between two addresses. Fields: `sender`, `receiver`, `amount`, `fee`, `nonce`, `public_key`, `signature`.
 
 - Coinbase transactions have an empty `sender` and carry no signature.
-- Non-coinbase transactions are signed with Ed25519 over `bincode(sender, receiver, amount, fee, nonce)`.
-- `new_signed(wallet, receiver, amount, fee)` constructs and signs a transaction, generating a random 53-bit nonce for uniqueness (53 bits keeps the value within JavaScript's safe integer range).
-- `verify()` checks that `public_key` hashes to `sender` and that the Ed25519 signature is valid.
+- Non-coinbase transactions are signed with Ed25519 over `bincode(CHAIN_ID, sender, receiver, amount, fee, nonce)`. Including `CHAIN_ID` (`"lootcoin-mainnet-1"`) prevents cross-chain replay: a signature valid on mainnet is invalid on any other chain that uses a different identifier.
+- `new_signed(wallet, receiver, amount, fee, nonce)` constructs and signs a transaction. The `nonce` is the sender's confirmed outbound transaction count at signing time and prevents replay without signature deduplication.
+- `verify()` checks that `public_key` hashes to `sender` (bech32m address) and that the Ed25519 signature is valid.
 
 ### `wallet`
 
@@ -29,7 +29,7 @@ Ed25519 keypair wrapper.
 - `Wallet::new()` generates a fresh keypair using the OS CSPRNG.
 - `Wallet::from_secret_key_bytes(bytes)` restores a wallet from a 32-byte seed.
 - `secret_key_bytes()` exports the 32-byte seed.
-- `get_address()` returns the 64-char hex-encoded CubeHash-256 digest of the public key.
+- `get_address()` returns the bech32m-encoded address (`loot1…`) derived from the CubeHash-256 digest of the public key.
 - `get_public_key_bytes()` returns the raw 32-byte Ed25519 public key.
 - `sign(data)` signs arbitrary bytes with the private key.
 
@@ -39,8 +39,7 @@ Protocol constants shared across all crates. Any tool that needs to reason about
 
 | Constant | Value | Meaning |
 |---|---|---|
-| `TICKET_MATURITY` | 100 blocks | Blocks before a mined ticket enters the reveal window |
-| `REVEAL_BLOCKS` | 10 blocks | Block hashes accumulated as lottery entropy |
+| `REVEAL_BLOCKS` | 100 blocks | Consecutive block hashes accumulated as entropy; settlement fires at `created_height + 100`. The window serves as both the maturity delay and the randomness source |
 | `PPM` | 1,000,000 | Outcome buckets per draw |
 | `MIN_TX_FEE` | 2 | Minimum fee for non-coinbase transactions; ensures 50/50 fee split gives ≥1 coin to each side |
 | `SMALL_DIVISOR` | 400,000 | 36.25% tier — `pot / 400,000` |
