@@ -88,23 +88,23 @@ pub fn meets_difficulty(hash: &[u8], bits: f64) -> bool {
 impl Block {
     /// Hash the full transaction list into a fixed-size commitment.
     /// Called once when a block is assembled; the result is stored in `tx_root`.
-    pub fn compute_tx_root(transactions: &[Transaction]) -> Vec<u8> {
-        let data = bincode::serialize(transactions).unwrap();
-        CubeHash256::digest(&data).to_vec()
+    pub fn compute_tx_root(transactions: &[Transaction]) -> Result<Vec<u8>, bincode::Error> {
+        let data = bincode::serialize(transactions)?;
+        Ok(CubeHash256::digest(&data).to_vec())
     }
 
     /// Hash only the fixed-size block header. Because `tx_root` already commits
     /// to the transaction list, the per-iteration work during mining is constant
     /// regardless of how many transactions the block contains.
-    pub fn calculate_hash(&self) -> Vec<u8> {
+    pub fn calculate_hash(&self) -> Result<Vec<u8>, bincode::Error> {
         let data = bincode::serialize(&(
             self.index,
             &self.previous_hash,
             self.timestamp,
             self.nonce,
             &self.tx_root,
-        )).unwrap();
-        CubeHash256::digest(&data).to_vec()
+        ))?;
+        Ok(CubeHash256::digest(&data).to_vec())
     }
 }
 

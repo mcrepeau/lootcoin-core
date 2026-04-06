@@ -48,7 +48,8 @@ impl Transaction {
             &temp_tx.amount,
             &temp_tx.fee,
             &temp_tx.nonce,
-        )).unwrap();
+        ))
+        .expect("bincode serialization of transaction fields is infallible");
         let signature = sender_wallet.sign(&tx_bytes);
         temp_tx.signature = signature.to_bytes().to_vec();
         temp_tx
@@ -69,14 +70,16 @@ impl Transaction {
 
         // Reconstruct the exact bytes that were signed: CHAIN_ID binds this
         // signature to lootcoin mainnet, preventing cross-chain replay.
-        let tx_bytes = bincode::serialize(&(
+        let Ok(tx_bytes) = bincode::serialize(&(
             CHAIN_ID,
             &self.sender,
             &self.receiver,
             &self.amount,
             &self.fee,
             &self.nonce,
-        )).unwrap();
+        )) else {
+            return false;
+        };
 
         let sig_bytes: [u8; 64] = match self.signature.clone().try_into() {
             Ok(arr) => arr,
@@ -108,7 +111,7 @@ impl Transaction {
             &self.public_key,
             &self.signature,
         ))
-        .unwrap();
+        .expect("bincode serialization of transaction fields is infallible");
         CubeHash256::digest(&data).into()
     }
 }
