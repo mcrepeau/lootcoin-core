@@ -30,7 +30,11 @@ pub struct Transaction {
 impl Transaction {
     pub fn new_signed(sender_wallet: &Wallet, receiver: String, amount: u64, fee: u64) -> Self {
         use rand::Rng;
-        let nonce: u64 = rand::thread_rng().gen();
+        // Mask to 53 bits so the value round-trips through JSON without precision
+        // loss in JavaScript (Number.MAX_SAFE_INTEGER = 2^53 − 1).  53 bits still
+        // gives ~2^26 expected transactions before the first collision (birthday
+        // bound), which is far beyond any realistic replay-attack window.
+        let nonce: u64 = rand::thread_rng().gen::<u64>() & 0x001F_FFFF_FFFF_FFFF;
         let sender = sender_wallet.get_address();
 
         let mut temp_tx = Transaction {
