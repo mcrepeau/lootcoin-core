@@ -19,16 +19,18 @@ pub struct Transaction {
     pub receiver: String,
     pub amount: u64,
     pub fee: u64,
-    /// Sequential account nonce. Equal to the number of confirmed outbound
-    /// transactions for this sender at the time of signing. Prevents replay
-    /// without requiring signature deduplication. Zero for coinbase transactions.
+    /// Random nonce generated at signing time. Included in the signed message
+    /// so that every transaction has a unique signature even when the other
+    /// fields are identical. Zero for coinbase transactions.
     pub nonce: u64,
     pub public_key: [u8; 32],
     pub signature: Vec<u8>,
 }
 
 impl Transaction {
-    pub fn new_signed(sender_wallet: &Wallet, receiver: String, amount: u64, fee: u64, nonce: u64) -> Self {
+    pub fn new_signed(sender_wallet: &Wallet, receiver: String, amount: u64, fee: u64) -> Self {
+        use rand::Rng;
+        let nonce: u64 = rand::thread_rng().gen();
         let sender = sender_wallet.get_address();
 
         let mut temp_tx = Transaction {
