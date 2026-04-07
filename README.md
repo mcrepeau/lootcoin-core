@@ -19,7 +19,7 @@ Represents a transfer of coins between two addresses. Fields: `sender`, `receive
 
 - Coinbase transactions have an empty `sender` and carry no signature.
 - Non-coinbase transactions are signed with Ed25519 over `bincode(CHAIN_ID, sender, receiver, amount, fee, nonce)`. Including `CHAIN_ID` (`"lootcoin-mainnet-1"`) prevents cross-chain replay: a signature valid on mainnet is invalid on any other chain that uses a different identifier.
-- `new_signed(wallet, receiver, amount, fee, nonce)` constructs and signs a transaction. The `nonce` is the sender's confirmed outbound transaction count at signing time and prevents replay without signature deduplication.
+- `new_signed(wallet, receiver, amount, fee)` constructs and signs a transaction. A cryptographically random 64-bit `nonce` is generated internally and included in the signed message, ensuring every call produces a unique signature even when all other fields are identical. Replay protection on the node side is signature-based: the node rejects any transaction whose signature bytes have already been confirmed.
 - `verify()` checks that `public_key` hashes to `sender` (bech32m address) and that the Ed25519 signature is valid.
 
 ### `wallet`
